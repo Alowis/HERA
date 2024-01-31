@@ -66,7 +66,39 @@ disNcopenloc=function(ncd,outloc,idc){
   return (outll)
 }
 
-
+#' Extract Upstream Area Data from NetCDF
+#'
+#' @description
+#' The `UpAopen` function opens a NetCDF file containing upstream area data and
+#' extracts the data for a specified outlet name. The function retrieves data
+#' for the entire grid defined by the longitude and latitude variables and
+#' then joins this data with a final location data frame using an identifier.
+#'
+#' @param dir A character string specifying the directory path where the NetCDF
+#'   file is located.
+#' @param outletname A character string specifying the name of the outlet for which
+#'   the upstream area data is to be extracted.
+#' @param Sloc_final A data frame with the final location information, including
+#'   an 'idlalo' column that contains identifiers used to join with the extracted
+#'   upstream area data.
+#'
+#' @return A data frame resulting from an inner join between the extracted upstream
+#'   area data and the final location data frame. The resulting data frame includes
+#'   longitude, latitude, upstream area (upa), and additional location identifiers.
+#'
+#' @examples
+#' # Assuming 'dir' is the directory path, 'outletname' is the outlet name, and
+#' # 'Sloc_final' is a data frame with location information:
+#' result <- UpAopen(dir, outletname, Sloc_final)
+#' # The result is a data frame with upstream area data joined with final location data.
+#'
+#' @export
+#' @importFrom ncdf4 nc_open ncvar_get
+#' @importFrom dplyr inner_join
+#'
+#' @seealso
+#' `ncdf4::nc_open`, `ncdf4::ncvar_get`, and `dplyr::inner_join` for more
+#' information on opening NetCDF files, extracting data, and joining data frames.
 UpAopen=function(dir,outletname,Sloc_final){
   ncbassin=paste0(dir,outletname)
   ncb=nc_open(ncbassin)
@@ -101,6 +133,8 @@ UpAopen=function(dir,outletname,Sloc_final){
   outfinal=inner_join(outll, Sloc_final, by="idlalo")
   return (outfinal)
 }
+
+
 resOpen=function(dir,outletname,ValidSY){
   ncbassin=paste0(dir,outletname)
   ncb=nc_open(ncbassin)
