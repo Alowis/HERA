@@ -1,24 +1,19 @@
-library(raster)
-library(rgdal)
-library(sf)
-library(tidyverse)
-library(ncdf4)
-library(sp)
-library(reshape)
-library(MASS)
-library(ggplot2)
-library(viridis)
-library(rnaturalearth)
-library(hydroGOF)
+# ==============================================================================
+# Title: Creation of the validation metrics and plots of the HERA dataset, linked to the article:  
+# HERA: a high-resolution pan-European hydrological reanalysis (1950-2020)
+# Author: Alois Tilloy - Joint Research Centre - Unit C6 
+# Date: 2024 -02 -01 
+# Description:
+#   This script allows to generate plots  and assess the skills of the HERA dataset against
+#   observed discharge data from 2901 river gauges across Europe
+# ==============================================================================
 
-source("~/LFRuns_utils/TS-EVA/functions.R")
-
+source("~/06_Floodrivers/DataPaper/Code/HERA/functions.R")
 
 main_path = 'D:/tilloal/Documents/06_Floodrivers/'
 valid_path = paste0(main_path,'DataPaper/')
 dis_path<-paste0(main_path,'dis/calibrated/filtered/Histo/')
 setwd(valid_path)
-
 
 
 # Data generation -----------------------------
