@@ -30,7 +30,7 @@ for (y in yrlist){
   Q_s <- Q_d[-1, ]
   Q_sim=rbind(Q_sim,Q_s)
 }
-write.csv(Q_sim,file="out/EFAS_19502020.csv")
+write.csv(Q_sim,file="out/HERA_Val_19502020.csv")
 
 # Part 1: Create the Valid station file -------------------------------------------
 
@@ -196,9 +196,9 @@ for (r in Vsfloc$V1){
 }
 
 ValidSf$distance=dist
-ValidSf$flag2[which(ValidSf$distance>2.5 & ValidSf$flag2==1 & ValidSf$removal=="")]=2
+ValidSf$flag2[which(ValidSf$flag2==1 & ValidSf$removal=="")]=2
 ValidSf$removal[which(ValidSf$flag2==2)]="YES"
-ValidSf$comment[which(ValidSf$flag2==2)]="too far from original station"
+ValidSf$comment[which(ValidSf$flag2==2)]="mismatch between Qobs and Qsim"
 
 length(ValidSf$comment[which(ValidSf$comment=="too far from original station")])
 length(ValidSf$comment[which(ValidSf$comment=="mismatch between obs and sim Qmean")])
@@ -214,6 +214,9 @@ StatCheck=ValidSf[which(ValidSf$flag2==1),]
 
 
 
+
+
+
 # Part 2: Diagnostic plots------------------------------------
 
 ValidSf=read.csv(file="Stations/Stations_Validation.csv")[,-1]
@@ -222,6 +225,7 @@ ValidSY=ValidSf[which(ValidSf$removal!="YES"),]
 #ValidSY is the final set of stations used
 
 vEFAS=ValidSY[which(ValidSY$csource=="EFAS"),]
+
 
 ## Figure S2 Upstream area--------------------------------------
 
@@ -335,10 +339,14 @@ biasfile="out/EFAS_obs_biasAY.csv"
 varfile="out/EFAS_obs_variabilityAY.csv"
   
 kge=SpatialSkillPlot(ValidSY,"kge",kgefile)[[1]]
+mean(kge$skill)
 corr=SpatialSkillPlot(ValidSY,"r",corrfile)[[1]]
 bias=SpatialSkillPlot(ValidSY,"b",biasfile)[[1]]
-mean(bias$skill)
-bg=kge$skill[which(kge$skill>0.49)]
+max(bias$skill)
+bg=kge[which(kge$skill<=-0.41),]
+
+
+
 length(bg)/2901
 plot(bg)
 var=SpatialSkillPlot(ValidSY,"v",varfile)[[1]]
@@ -352,7 +360,7 @@ Plots=FALSE
 if (Plots=TRUE){
   kgep=SpatialSkillPlot(ValidSY,"kge",kgefile)[[2]]
   kgep
-  ggsave("Plots/Validation_KGEf.jpg", width=20, height=20, units=c("cm"),dpi=1500)
+  ggsave("Plots/Validation_KGEf2.jpg", width=20, height=20, units=c("cm"),dpi=1500)
   
   corr=SpatialSkillPlot(ValidSY,"r",corrfile)
   corr[[2]]
