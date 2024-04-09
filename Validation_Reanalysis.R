@@ -337,9 +337,20 @@ kgefile="out/EFAS_obs_kgeAY.csv"
 corrfile="out/EFAS_obs_corr_PearsonAY.csv"
 biasfile="out/EFAS_obs_biasAY.csv"
 varfile="out/EFAS_obs_variabilityAY.csv"
-  
+
+
+##Add the skills for logged data
+logval=T
+kgefile="out/EFAS_obs_logkgeAY.csv"
+corrfile="out/EFAS_obs_logcorr_PearsonAY.csv"
+biasfile="out/EFAS_obs_logbiasAY.csv"
+varfile="out/EFAS_obs_logvariabilityAY.csv"
+
+
+
+
 kge=SpatialSkillPlot(ValidSY,"kge",kgefile)[[1]]
-mean(kge$skill)
+median(kge$skill)
 corr=SpatialSkillPlot(ValidSY,"r",corrfile)[[1]]
 bias=SpatialSkillPlot(ValidSY,"b",biasfile)[[1]]
 max(bias$skill)
@@ -358,28 +369,37 @@ kgeout <- st_transform(kgeout, crs = 3035)
 
 Plots=FALSE
 if (Plots=TRUE){
-  kgep=SpatialSkillPlot(ValidSY,"kge",kgefile)[[2]]
-  kgep
-  ggsave("Plots/Validation_KGEf2.jpg", width=20, height=20, units=c("cm"),dpi=1500)
-  
+  kgep=SpatialSkillPlot(ValidSY,"kge",kgefile)
+  kgep[[1]]
   corr=SpatialSkillPlot(ValidSY,"r",corrfile)
   corr[[2]]
-  ggsave("Plots/Validation_corrFS.jpg", width=20, height=20, units=c("cm"),dpi=1500)
-  
   biasp=SpatialSkillPlot(ValidSY,"b",biasfile)
   biasp[[2]]
-  ggsave("Plots/Validation_biasF.jpg", width=20, height=20, units=c("cm"),dpi=1500)
-  
   varp=SpatialSkillPlot(ValidSY,"v",varfile)
   varp[[2]]
-  ggsave("Plots/Validation_varF.jpg", width=20, height=20, units=c("cm"),dpi=1500)
+  
+  if (logval==F){
+    ggsave("Plots/Validation_KGE.jpg", kgep.width=20, height=20, units=c("cm"),dpi=1500)
+    ggsave("Plots/Validation_corr.jpg",  corr[[2]], width=20, height=20, units=c("cm"),dpi=1500)
+    ggsave("Plots/Validation_bias.jpg",  biasp[[2]], width=20, height=20, units=c("cm"),dpi=1500)
+    ggsave("Plots/Validation_var.jpg",  varp[[2]], width=20, height=20, units=c("cm"),dpi=1500)
+  }
+  if (logval==T){
+    ggsave("Plots/Validation_KGE_log.jpg", kgep,width=20, height=20, units=c("cm"),dpi=1500)
+    ggsave("Plots/Validation_corr_log.jpg",  corr[[2]], width=20, height=20, units=c("cm"),dpi=1500)
+    ggsave("Plots/Validation_bias_log.jpg",  biasp[[2]], width=20, height=20, units=c("cm"),dpi=1500)
+    ggsave("Plots/Validation_var_log.jpg",  varp[[2]],width=20, height=20, units=c("cm"),dpi=1500)
+  }
+
+
   
   #other values histogram
   length(which(bias$skill>0.8 & bias$skill<1.2))/length(bias$skill)
   length(which(corr$skill>0.5))/length(corr$skill)
-  ValidSZ=kge
-  name="KGE"
-  limi=c(-1,1)
+  ValidSZ=biasp[[1]]
+  name="bias"
+  limi=c(0,2)
+  hist(ValidSZ$skill)
   
   p<-ggplot(ValidSZ, aes(x=skill)) + 
     geom_histogram(fill="aliceblue", color="grey20",alpha=0.9,lwd=1,bins=30) +
@@ -406,6 +426,7 @@ if (Plots=TRUE){
   
   bias=SpatialSkillPlot(ValidSY,"b",biasfile)
   ValidSZ=bias[[1]]
+  min(ValidSZ$skill)
   ptn=empdis(ValidSY$skill,1)
   ptn$y=ptn$emp.f*400
   p<-ggplot(ValidSZ, aes(x=skill)) + 
@@ -433,7 +454,7 @@ if (Plots=TRUE){
   
   p
   ggsave("histo_kge_AY.jpg", p, width=20, height=15, units=c("cm"),dpi=1500)
-  parpl=kge[[1]]
+  parpl=kgep[[1]]
   
   length(parpl$skill[which(parpl$skill>=0.5)])/length(parpl$skill)
   median(parpl$skill)
