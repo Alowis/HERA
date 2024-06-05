@@ -340,20 +340,21 @@ varfile="out/EFAS_obs_variabilityAY.csv"
 
 
 ##Add the skills for logged data
-logval=T
-kgefile="out/EFAS_obs_logkgeAY.csv"
-corrfile="out/EFAS_obs_logcorr_PearsonAY.csv"
-biasfile="out/EFAS_obs_logbiasAY.csv"
-varfile="out/EFAS_obs_logvariabilityAY.csv"
+sqval=T
+kgefile="out/EFAS_obs_sqrtkgeAY.csv"
+corrfile="out/EFAS_obs_sqrtcorr_PearsonAY.csv"
+biasfile="out/EFAS_obs_sqrtbiasAY.csv"
+varfile="out/EFAS_obs_sqrtvariabilityAY.csv"
 
 
 
 
 kge=SpatialSkillPlot(ValidSY,"kge",kgefile)[[1]]
 median(kge$skill)
+quantile(kge$skill,c(0.25,0.5,0.75))
 corr=SpatialSkillPlot(ValidSY,"r",corrfile)[[1]]
 bias=SpatialSkillPlot(ValidSY,"b",biasfile)[[1]]
-max(bias$skill)
+median(bias$skill)
 bg=kge[which(kge$skill<=-0.41),]
 
 
@@ -361,6 +362,7 @@ bg=kge[which(kge$skill<=-0.41),]
 length(bg)/2901
 plot(bg)
 var=SpatialSkillPlot(ValidSY,"v",varfile)[[1]]
+mean(var$skill)
 length((var$value[which(var$value<1)]))/length(var$value)
 kgeout=kge[[1]]
 kgeout <- st_as_sf(kgeout, coords = c("Var1", "Var2"), crs = 4326)
@@ -377,18 +379,18 @@ if (Plots=TRUE){
   biasp[[2]]
   varp=SpatialSkillPlot(ValidSY,"v",varfile)
   varp[[2]]
-  
-  if (logval==F){
+
+  if (sqval==F){
     ggsave("Plots/Validation_KGE.jpg", kgep.width=20, height=20, units=c("cm"),dpi=1500)
     ggsave("Plots/Validation_corr.jpg",  corr[[2]], width=20, height=20, units=c("cm"),dpi=1500)
     ggsave("Plots/Validation_bias.jpg",  biasp[[2]], width=20, height=20, units=c("cm"),dpi=1500)
     ggsave("Plots/Validation_var.jpg",  varp[[2]], width=20, height=20, units=c("cm"),dpi=1500)
   }
-  if (logval==T){
-    ggsave("Plots/Validation_KGE_log.jpg", kgep,width=20, height=20, units=c("cm"),dpi=1500)
-    ggsave("Plots/Validation_corr_log.jpg",  corr[[2]], width=20, height=20, units=c("cm"),dpi=1500)
-    ggsave("Plots/Validation_bias_log.jpg",  biasp[[2]], width=20, height=20, units=c("cm"),dpi=1500)
-    ggsave("Plots/Validation_var_log.jpg",  varp[[2]],width=20, height=20, units=c("cm"),dpi=1500)
+  if (sqval==T){
+    ggsave("Plots/Validation_KGE_sqrt.jpg", kgep[[2]],width=20, height=20, units=c("cm"),dpi=1500)
+    ggsave("Plots/Validation_corr_sqrt.jpg",  corr[[2]], width=20, height=20, units=c("cm"),dpi=1500)
+    ggsave("Plots/Validation_bias_sqrt.jpg",  biasp[[2]], width=20, height=20, units=c("cm"),dpi=1500)
+    ggsave("Plots/Validation_var_sqrt.jpg",  varp[[2]],width=20, height=20, units=c("cm"),dpi=1500)
   }
 
 
@@ -399,6 +401,7 @@ if (Plots=TRUE){
   ValidSZ=biasp[[1]]
   name="bias"
   limi=c(0,2)
+  
   hist(ValidSZ$skill)
   
   p<-ggplot(ValidSZ, aes(x=skill)) + 
@@ -425,7 +428,7 @@ if (Plots=TRUE){
   ggsave("histo_var_AY.jpg", p, width=20, height=15, units=c("cm"),dpi=1500)
   
   bias=SpatialSkillPlot(ValidSY,"b",biasfile)
-  ValidSZ=bias[[1]]
+  ValidSZ=kgep[[1]]
   min(ValidSZ$skill)
   ptn=empdis(ValidSY$skill,1)
   ptn$y=ptn$emp.f*400
@@ -437,7 +440,7 @@ if (Plots=TRUE){
     geom_line(data=ptn, aes(x=Q, y=y),col="red",lwd=1.2)+
     scale_y_continuous(name="Number of stations",    # Add a second axis and specify its features
                        sec.axis = sec_axis( trans=~./400, name="ECDF"))+
-    scale_x_continuous(name=name,limit=limi, breaks=seq(-1,2,by=0.2)) +
+    scale_x_continuous(name=name,limit=limi, breaks=seq(-1,1,by=0.2)) +
     # scale_x_discrete(labels= c("< -0.41","-0.41-0.2", "0.2-0.5","0.5-0.7","0.7-0.8", ">0.8"), name="KGE")+
     theme(axis.title=element_text(size=16, face="bold"),
           axis.text = element_text(size=13),
@@ -490,7 +493,7 @@ if (Plots=TRUE){
 
 ### Boxplot of performance by catchment area groups -----------------
 #groups= 100-1000 1000-10000 10000-100000 100000-10000000
-
+ValidSY=kgep[[1]]
 ValidSY$UpAgroup=1
 ValidSY$UpAgroup[which(ValidSY$UpA>200 & ValidSY$UpA<=500)]=2
 ValidSY$UpAgroup[which(ValidSY$UpA>500 & ValidSY$UpA<=1000)]=3
