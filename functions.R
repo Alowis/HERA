@@ -372,7 +372,7 @@ disNcopenloc=function(fname,dir,outloc,idc){
   ncdis=paste0(dir,"/",fname,".nc")
   ncd=nc_open(ncdis)
   name.vb=names(ncd[['var']])
-  namev=name.vb[1]
+  namev="dis"
   time <- ncvar_get(ncd,"time")
   lt=length(time)
   

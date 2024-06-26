@@ -32,6 +32,10 @@ for (y in yrlist){
 }
 write.csv(Q_sim,file="out/HERA_Val_19502020.csv")
 
+
+
+
+
 # Part 1: Create the Valid station file -------------------------------------------
 
 #Loading all txt files with matching locations
@@ -46,6 +50,11 @@ for (yi in yrlist){
 }
 Sloc_final=Sloc[which(Sloc$V2!=0),]
 Sloc_final$csource="SpatialQMatch"
+
+## First wave of cleaning: removing stations with no EFAS match and UpA<100-------
+#keep track of these stations
+Sloc_rmv=Sloc$V1[which(Sloc$V2==0)]
+#stations removed because there was no matching pixel with UpA>100
 
 #transalting to R indexing after python
 Sloc_final$V2=Sloc_final$V2+1
@@ -62,7 +71,13 @@ Sloc_final$idlalo=paste(Sloc_final$V3,Sloc_final$V2, sep=" ")
 outletname="GIS/upArea_European_01min.nc"
 dir=valid_path
 UpArea=UpAopen(valid_path,outletname,Sloc_final)
+NonvalidSta=UpArea[-which(UpArea$upa>100),]
+
+## Removing stations with no EFAS match and UpA<100-----------
+print(length(NonvalidSta$Var1)+length(Sloc_rmv))
+allrm=c(NonvalidSta$V1,Sloc_rmv)
 ValidSta=UpArea[which(UpArea$upa>100),]
+print(length(ValidSta$Var1))
 
 ## Flag EFAS stations that were used for calibration --------
 efas_stations_orig=read.csv("Stations/stations_efas_meta.csv",sep=";")
@@ -75,12 +90,26 @@ ValidSta$calib=FALSE
 matchcal=match(efas_stations_cal$StationID,ValidSta$V1)
 ValidSta$calib[matchcal]=TRUE
 
+
+
+
+## Joke stops here, loading of GRDC database
+library(readxl)
+GRDC=read_excel("GRDC_Stations.xlsx")
+
+#match GRDC with my stations
+
+#identify the stations which dont have efas and GRDC
+
+Valid_GRDC=left_join(ValidSta,GRDC,by=c("V1"="grdc_no"))
+
+only_GRDC=inner_join(ValidSta,GRDC,by=c("V1"="grdc_no"))
 ## Flag stations that have very different mean discharges -------------
 fileobs="out/obs_meanAY.csv"
 filesim="out/EFAS_meanAY.csv"
-obs=read.csv(paste0(valid_path,fileobs))
+obs=read.csv(paste0(valid_path,fileobs),header = F)
 names(obs)=c("Station_ID","mean")
-sim=read.csv(paste0(valid_path,filesim))
+sim=read.csv(paste0(valid_path,filesim),header = F)
 names(sim)=c("Station_ID","mean")
 
 years=c(1950:2020)
@@ -89,9 +118,22 @@ simtest=sim[which(!is.infinite(sim$mean)),]
 obs_sim=inner_join(obstest,simtest, by=c("Station_ID"))
 names(obs_sim)[c(2,3)]=c("obs","sim")
 
+
 #Remove stations that were removed in the first step
+#step 1, station with Upa<100km2
+#these station represent rmv01
 rmv0=which(!is.na(match(obs_sim$Station_ID,ValidSta$V1)))
+rmv01=which(is.na(match(obs_sim$Station_ID,ValidSta$V1)))
+print(length(rmv01))
+#get station id of rmv01 for double check
+rmcheck=obs_sim$Station_ID[rmv01]
+
+length(which(!is.na(match(rmcheck,allrm))))
+
+#valid
+
 obs_sim=obs_sim[rmv0,]
+rmv1=match(obs_sim$Station_ID,ValidSta$V1)
 rmv1=match(obs_sim$Station_ID,ValidSta$V1)
 obs_sim$UpA=ValidSta$upa[rmv1]
 
@@ -112,28 +154,63 @@ RecordLen=data.frame(Station_data_IDs,lR)
 rmv2=match(obs_sim$Station_ID,RecordLen[,1])
 obs_sim$Rlen=RecordLen$lR[rmv2]
 dat=obs_sim
-rat1=abs((dat$sim-dat$obs))/dat$obs
-rat2=abs((dat$obs-dat$sim))/dat$sim
+rat1=abs(dat$sim)/dat$obs
+rat2=abs(dat$obs)/dat$sim
 rmv=which(rat1>3 | rat2>3)
 dat$rat1=rat1
 dat$rat2=rat2
 dat$flag1=NA
 dat$flag1[which(dat$rat1>3 | dat$rat2>3)]=1
 dat$flag1[which(dat$obs>10 & dat$flag1==1)]=2
-dat$flag1[which(dat$rat1>6 | dat$rat2>6)]=3
+dat$flag1[which(dat$rat1>6 | dat$rat2>6)]=2
 
+
+length(unique((ValidSta$V1)))
 #loading stations' initial database
 Q_stations <- st_read(paste0(valid_path,'Europe_daily_combined_2022_v2_WGS84_NUTS.shp')) 
 
 #Writing result: merging dat and validSta
-ValidS=inner_join(ValidSta,dat,by=c("V1"="Station_ID"))
+ValidS=inner_join(Valid_GRDC,dat,by=c("V1"="Station_ID"))
 ValidS=inner_join(ValidS,Q_stations,by = c("V1"="StationID"))
 
+plot(ValidS$upa,ValidS$area)
+
+
+#extract location where upa is very different
+
+pb_up=ValidS$upa/ValidS$area
+pb_up[which(pb_up<0)]=NA
+ValidS$upar=pb_up
+pb_id=which(pb_up<0.8 | pb_up>1.2)
+
+ValidS$flagx=NA
+ValidS$flagx[which( (pb_up<0.2 | pb_up>1.8) & !is.na(ValidS$flag1))]=1
+ValidPb=ValidS[pb_id,]
 #reorganise the data
 ValidSf=ValidS[,c(1,2,7,19,4,5,6,14,10,11,12,13,15,18,22)]
 
+#remove stations with flag 1 problematic
+
+#first remove points with unmatching upstream area and discharge
+rmsta=ValidS[which(ValidS$flagx==1),]
+length(rmsta$Var1)
+
+ValidX=ValidS[-which(ValidS$flagx==1),]
+
+#then remove points with unmatching discharge
+rmsta1=ValidX[which(ValidX$flag1==2),]
+length(rmsta1$Var1)
+
+ValidY=ValidX[-which(ValidX$flag1==2),]
+
+
+#now remove 132 stations
+
+# ValidSf=ValidSf[-which(ValidS$flag1==2),]
+
+ValidSf=ValidY
 ## Identify stations with low KGE ---------------
-kgefile="out/EFAS_obs_kgeAY.csv"
+kgefile="out/EFAS_obs_KGEAY.csv"
 kge=SpatialSkillPlot(ValidSf,"kge",kgefile)
 ValidSf=kge[[1]][,-16]
 #Isolate problematic stations:
@@ -142,16 +219,49 @@ ValidSf$flag2[which(ValidSf$skill<=(-0.41))]=1
 ValidSf$removal = ""
 ValidSf$comment = ""
 
+
+#On these stations, i redo a check based on distance
+
+## Distance between "official gauges" and efas points -----------------------
+points=ValidSf[,c(7,1,2)]
+Vsfloc=st_as_sf(points, coords = c("Var1", "Var2"), crs = 4326)
+Statloc=Q_stations
+Sfloc=inner_join(points,Statloc,by=c("V1"="StationID"))
+dist=c()
+for (r in Vsfloc$V1){
+  cat(paste0(r,"\n"))
+  v1=Vsfloc[which(Vsfloc$V1==r),]
+  v2=Statloc[which(Statloc$StationID==r),]
+  oula=st_distance(v1,v2)
+  oula=oula/1000
+  dist=c(dist,oula)
+}
+
+ValidSf$distance=dist
+
+
+## Remove pixels with distance >2.5 km and low KGE'
+
+
+#I have to work again on this####
+
+#Clean the Mancheck file
 Mancheck_in=ValidSf[which(ValidSf$flag2==1),]
-#write.csv(Mancheck_in,file="stations_manual_check.csv")
+
+
+
+write.csv(Mancheck_in,file="stations_manual_check_revisions2.csv")
 
 ## Individual check of the remaining stations ------------------
 #The manual check is done in excel
 
 #load remaining stations checked
-Mancheck=read.csv(file="Stations/stations_manual_check.csv")
+Mancheck=read.csv(file="Stations/stations_manual_remove.csv")
 Mancheck=Mancheck[,-1]
-manmatch=match(Mancheck$V1,ValidSf$V1)
+manmatch=match(Mancheck$V1,Mancheck_in$V1)
+
+length(na.omit(manmatch))
+
 Vcheck=Mancheck[c(25,26)]
 colnames(Vcheck)
 colnames(ValidSf)[c(19,20)]
@@ -180,22 +290,7 @@ ValidSf$removal[which(ValidSf$flag1==2 & ValidSf$removal=="")]="YES"
 ValidSf$comment[which(ValidSf$flag1==3 & ValidSf$removal=="")]="mismatch between obs and sim Qmean"
 ValidSf$removal[which(ValidSf$flag1==3 & ValidSf$removal=="")]="YES"
 
-## Distance between "official gauges" and efas points -----------------------
-points=ValidSf[,c(1,2,3)]
-Vsfloc=st_as_sf(points, coords = c("Var1", "Var2"), crs = 4326)
-Statloc=Q_stations
-Sfloc=inner_join(points,Statloc,by=c("V1"="StationID"))
-dist=c()
-for (r in Vsfloc$V1){
-  cat(paste0(r,"\n"))
-  v1=Vsfloc[which(Vsfloc$V1==r),]
-  v2=Statloc[which(Statloc$StationID==r),]
-  oula=st_distance(v1,v2)
-  oula=oula/1000
-  dist=c(dist,oula)
-}
 
-ValidSf$distance=dist
 ValidSf$flag2[which(ValidSf$flag2==1 & ValidSf$removal=="")]=2
 ValidSf$removal[which(ValidSf$flag2==2)]="YES"
 ValidSf$comment[which(ValidSf$flag2==2)]="mismatch between Qobs and Qsim"
