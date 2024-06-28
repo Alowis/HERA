@@ -20,17 +20,17 @@ setwd(valid_path)
 #Load all Q_EFAS (HERA simulated discharge) and create a single file
 #create one file with all years
 y=1950
-Q_d <- read.csv(paste0('out/EFAS_', y, '.csv'), header = F)  # CSVs with observations
+Q_d <- read.csv(paste0('out/EFAS_v2_', y, '.csv'), header = F)  # CSVs with observations
 Station_data_IDs <- as.vector(t(Q_d[1, ]))
 Q_sim <- Q_d
 yrlist=c(1951:2020)
 for (y in yrlist){
   print(y)
-  Q_d <- read.csv(paste0('out/EFAS_', y, '.csv'), header = F)  # CSVs with observations
+  Q_d <- read.csv(paste0('out/EFAS_v2_', y, '.csv'), header = F)  # CSVs with observations
   Q_s <- Q_d[-1, ]
   Q_sim=rbind(Q_sim,Q_s)
 }
-write.csv(Q_sim,file="out/HERA_Val_19502020.csv")
+write.csv(Q_sim,file="out/HERA_Val2_19502020.csv")
 
 
 
@@ -40,11 +40,11 @@ write.csv(Q_sim,file="out/HERA_Val_19502020.csv")
 
 #Loading all txt files with matching locations
 #load matching coordinates
-Sloc=read.table(paste0(valid_path,"out/Stations_locations_EFAS_grid_1950.txt"),sep=",")
+Sloc=read.table(paste0(valid_path,"out/Stations_locations_EFAS_gridv2_1950.txt"),sep=",")
 yrlist=c(1951:2020)
 for (yi in yrlist){
   print(yi)
-  Slocy=read.table(paste0(valid_path,"out/Stations_locations_EFAS_grid_",yi,".txt"),sep=",")
+  Slocy=read.table(paste0(valid_path,"out/Stations_locations_EFAS_gridv2_",yi,".txt"),sep=",")
   Slocrep=Slocy[which(Sloc$V2==0),]
   Sloc[which(Sloc$V2==0),]=Slocrep
 }
@@ -66,6 +66,20 @@ efasmatch=match(flefas$StationID,Sloc_final$V1)
 faichier=inner_join(flefas,Sloc_final,by=c("StationID"="V1"))
 Sloc_final$csource[efasmatch]="EFAS"
 Sloc_final$idlalo=paste(Sloc_final$V3,Sloc_final$V2, sep=" ")
+
+## loading of GRDC database
+library(readxl)
+GRDC=read_excel("GRDC_Stations.xlsx")
+
+grdcmatch=na.omit(match(GRDC$grdc_no,Sloc_final$V1))
+verif=Sloc_final[grdcmatch,] 
+
+grdstat=verif[-which(verif$csource=="EFAS"),]
+
+gmatf=match(grdstat$V1,Sloc_final$V1)
+
+Sloc_final$csource[gmatf]="GRDCUpA"
+
 
 #Now the upstream area
 outletname="GIS/upArea_European_01min.nc"
@@ -93,9 +107,6 @@ ValidSta$calib[matchcal]=TRUE
 
 
 
-## Joke stops here, loading of GRDC database
-library(readxl)
-GRDC=read_excel("GRDC_Stations.xlsx")
 
 #match GRDC with my stations
 
@@ -105,8 +116,8 @@ Valid_GRDC=left_join(ValidSta,GRDC,by=c("V1"="grdc_no"))
 
 only_GRDC=inner_join(ValidSta,GRDC,by=c("V1"="grdc_no"))
 ## Flag stations that have very different mean discharges -------------
-fileobs="out/obs_meanAY.csv"
-filesim="out/EFAS_meanAY.csv"
+fileobs="out/obs_meanAY2.csv"
+filesim="out/EFAS_meanAY2.csv"
 obs=read.csv(paste0(valid_path,fileobs),header = F)
 names(obs)=c("Station_ID","mean")
 sim=read.csv(paste0(valid_path,filesim),header = F)
@@ -170,48 +181,55 @@ length(unique((ValidSta$V1)))
 Q_stations <- st_read(paste0(valid_path,'Europe_daily_combined_2022_v2_WGS84_NUTS.shp')) 
 
 #Writing result: merging dat and validSta
-ValidS=inner_join(Valid_GRDC,dat,by=c("V1"="Station_ID"))
+ValidS=inner_join(ValidSta,dat,by=c("V1"="Station_ID"))
 ValidS=inner_join(ValidS,Q_stations,by = c("V1"="StationID"))
 
-plot(ValidS$upa,ValidS$area)
+ValidS$grdc_upa=Valid_GRDC$area
+ValidS$river_name=Valid_GRDC$river
+ValidS$grdc_qa=Valid_GRDC$lta_discharge
+
 
 
 #extract location where upa is very different
 
-pb_up=ValidS$upa/ValidS$area
+pb_up=ValidS$upa/ValidS$grdc_upa
 pb_up[which(pb_up<0)]=NA
+pb_up[which(is.infinite(pb_up))]=NA
 ValidS$upar=pb_up
-pb_id=which(pb_up<0.8 | pb_up>1.2)
+pb_id=which(pb_up<0.5 | pb_up>1.5)
 
-ValidS$flagx=NA
-ValidS$flagx[which( (pb_up<0.2 | pb_up>1.8) & !is.na(ValidS$flag1))]=1
+plot(ValidS$upar, log="y")
+abline(h=1.5,col=2)
+abline(h=0.5,col=2)
+
+ValidS$flagA=NA
+ValidS$flagA[which(pb_up<0.5 | pb_up>1.5)]=1
 ValidPb=ValidS[pb_id,]
 #reorganise the data
-ValidSf=ValidS[,c(1,2,7,19,4,5,6,14,10,11,12,13,15,18,22)]
-
+ValidSf=ValidS[,c(1,2,3,7,10,11,12,13,29,14,27,15,18,19,28,30,31)]
 #remove stations with flag 1 problematic
 
 #first remove points with unmatching upstream area and discharge
-rmsta=ValidS[which(ValidS$flagx==1),]
+rmsta=ValidSf[which(ValidSf$flagA==1),]
 length(rmsta$Var1)
 
-ValidX=ValidS[-which(ValidS$flagx==1),]
+ValidX=ValidSf[-which(ValidSf$flagA==1),]
 
 #then remove points with unmatching discharge
 rmsta1=ValidX[which(ValidX$flag1==2),]
 length(rmsta1$Var1)
 
-ValidY=ValidX[-which(ValidX$flag1==2),]
+ValidXf=ValidX[-which(ValidX$flag1==2),]
 
 
 #now remove 132 stations
 
 # ValidSf=ValidSf[-which(ValidS$flag1==2),]
 
-ValidSf=ValidY
+ValidSf=ValidXf
 ## Identify stations with low KGE ---------------
-kgefile="out/EFAS_obs_KGEAY.csv"
-kge=SpatialSkillPlot(ValidSf,"kge",kgefile)
+kgefile="out/EFAS_obs_KGEAY2.csv"
+kge=SpatialSkillPlot(ValidXf,"kge",kgefile)
 ValidSf=kge[[1]][,-16]
 #Isolate problematic stations:
 ValidSf$flag2=NA
@@ -223,7 +241,7 @@ ValidSf$comment = ""
 #On these stations, i redo a check based on distance
 
 ## Distance between "official gauges" and efas points -----------------------
-points=ValidSf[,c(7,1,2)]
+points=ValidSf[,c(4,1,2)]
 Vsfloc=st_as_sf(points, coords = c("Var1", "Var2"), crs = 4326)
 Statloc=Q_stations
 Sfloc=inner_join(points,Statloc,by=c("V1"="StationID"))
@@ -237,7 +255,9 @@ for (r in Vsfloc$V1){
   dist=c(dist,oula)
 }
 
+st_write(Vsfloc,"HERA_matched_locs2.shp")
 ValidSf$distance=dist
+
 
 
 ## Remove pixels with distance >2.5 km and low KGE'
@@ -248,55 +268,70 @@ ValidSf$distance=dist
 #Clean the Mancheck file
 Mancheck_in=ValidSf[which(ValidSf$flag2==1),]
 
-
-
-write.csv(Mancheck_in,file="stations_manual_check_revisions2.csv")
+write.csv(Mancheck_in,file="stations_manual_check_revisions4.csv")
 
 ## Individual check of the remaining stations ------------------
+
+
+#plot weird stations
+range=c(15000:20000)
+Qplot=as.numeric(Q_data[,which(Q_data[1,]=="6122130")][-c(1:4)])
+plot(Qplot[range],type="l")
+
+
+Hplot=as.numeric(Q_sim[,which(Q_sim[1,]==6122130)][-1])
+#Qplot2=as.numeric(Q_data[,which(Q_data[1,]=="6343111")][-c(1:4)])
+
+# lines(Qplot2[range],col=2)
+lines(Hplot[range],col=4)
+mean(Hplot,na.rm=T)
+KGE(Hplot, Qplot,na.rm=TRUE, method="2012",out.type="full")
 #The manual check is done in excel
 
 #load remaining stations checked
-Mancheck=read.csv(file="Stations/stations_manual_remove.csv")
+
+Mancheck=read.csv(file="stations_manual_check_revisions4.csv")
 Mancheck=Mancheck[,-1]
-manmatch=match(Mancheck$V1,Mancheck_in$V1)
+manmatch=match(Mancheck$V1,ValidSf$V1)
+
+#recompute KGE for catchments with wrong spatial match
+#relou
+
 
 length(na.omit(manmatch))
 
-Vcheck=Mancheck[c(25,26)]
+Vcheck=Mancheck[c(21,22)]
 colnames(Vcheck)
-colnames(ValidSf)[c(19,20)]
-ValidSf[manmatch,c(19,20)]=Vcheck
+colnames(ValidSf)[c(21,22)]
+ValidSf[manmatch,c(21,22)]=Vcheck
 
 #Other manual Checks
-#Gagnieres 6139070
-ValidSf$comment[which(ValidSf$V1==6139070)]="wrong river"
-ValidSf$removal[which(ValidSf$V1==6139070)]="YES"
 #6233203
-ValidSf$comment[which(ValidSf$V1==6233203)]="dubious observations"
-ValidSf$removal[which(ValidSf$V1==6233203)]="YES"
+# ValidSf$comment[which(ValidSf$V1==6233203)]="dubious observations"
+# ValidSf$removal[which(ValidSf$V1==6233203)]="YES"
 #6118175
-ValidSf$comment[which(ValidSf$V1==6118175)]="wrong location"
-ValidSf$removal[which(ValidSf$V1==6118175)]="YES"
+# ValidSf$comment[which(ValidSf$V1==6118175)]="wrong location"
+# ValidSf$removal[which(ValidSf$V1==6118175)]="YES"
 #6124440
-ValidSf$comment[which(ValidSf$V1==6124440)]="wrong location"
-ValidSf$removal[which(ValidSf$V1==6124440)]="YES"
-#6340215
-ValidSf$comment[which(ValidSf$V1==6340215)]="wrong location"
-ValidSf$removal[which(ValidSf$V1==6340215)]="YES"
+# ValidSf$comment[which(ValidSf$V1==6124440)]="wrong location"
+# ValidSf$removal[which(ValidSf$V1==6124440)]="YES"
+# #6340215
+# ValidSf$comment[which(ValidSf$V1==6340215)]="wrong location"
+# ValidSf$removal[which(ValidSf$V1==6340215)]="YES"
 
-ValidSf$comment[which(ValidSf$flag1==2 & ValidSf$removal=="")]="mismatch between obs and sim Qmean"
-ValidSf$removal[which(ValidSf$flag1==2 & ValidSf$removal=="")]="YES"
+# ValidSf$comment[which(ValidSf$flag1==2 & ValidSf$removal=="")]="mismatch between obs and sim Qmean"
+# ValidSf$removal[which(ValidSf$flag1==2 & ValidSf$removal=="")]="YES"
+# 
+# ValidSf$comment[which(ValidSf$flag1==3 & ValidSf$removal=="")]="mismatch between obs and sim Qmean"
+# ValidSf$removal[which(ValidSf$flag1==3 & ValidSf$removal=="")]="YES"
+# 
+# 
+# ValidSf$flag2[which(ValidSf$flag2==1 & ValidSf$removal=="")]=2
+# ValidSf$removal[which(ValidSf$flag2==2)]="YES"
+# ValidSf$comment[which(ValidSf$flag2==2)]="mismatch between Qobs and Qsim"
 
-ValidSf$comment[which(ValidSf$flag1==3 & ValidSf$removal=="")]="mismatch between obs and sim Qmean"
-ValidSf$removal[which(ValidSf$flag1==3 & ValidSf$removal=="")]="YES"
-
-
-ValidSf$flag2[which(ValidSf$flag2==1 & ValidSf$removal=="")]=2
-ValidSf$removal[which(ValidSf$flag2==2)]="YES"
-ValidSf$comment[which(ValidSf$flag2==2)]="mismatch between Qobs and Qsim"
-
-length(ValidSf$comment[which(ValidSf$comment=="too far from original station")])
-length(ValidSf$comment[which(ValidSf$comment=="mismatch between obs and sim Qmean")])
+# length(ValidSf$comment[which(ValidSf$comment=="too far from original station")])
+# length(ValidSf$comment[which(ValidSf$comment=="mismatch between obs and sim Qmean")])
 konar=(ValidSf[which(ValidSf$removal=="YES"),])
 length(which(ValidSf$removal=="YES"))
 length(ValidSf$comment[which(ValidSf$csource=="EFAS")])
@@ -306,22 +341,23 @@ length(ValidSf$comment[which(ValidSf$csource=="EFAS")])
 StatCheck=ValidSf[which(ValidSf$flag2==1),]
 #write.csv(StatCheck,file="Stations/Stations_lowKGE.csv")
 
+# ValidSf=ValidSf[-which(ValidSf$removal=="YES"),]
 
 
-
-
+write.csv(ValidSf,file="Stations/Stations_ValidationR.csv")
 
 
 # Part 2: Diagnostic plots------------------------------------
 
-ValidSf=read.csv(file="Stations/Stations_Validation.csv")[,-1]
+ValidSf=read.csv(file="Stations/Stations_ValidationR.csv")[,-1]
 
 ValidSY=ValidSf[which(ValidSf$removal!="YES"),]
+ValidSY=ValidSY[,c(1:16)]
 #ValidSY is the final set of stations used
 
 vEFAS=ValidSY[which(ValidSY$csource=="EFAS"),]
 
-
+ValidSYl=ValidSY[which(ValidSY$Rlen>(30*365)),]
 ## Figure S2 Upstream area--------------------------------------
 
 ### Figure S2.a Map of upstream area--------------------------------------
@@ -339,7 +375,7 @@ osize=12
 basemap=w2
 palet=c(hcl.colors(9, palette = "viridis", alpha = NULL, rev = T, fixup = TRUE))
 
-ppl <- st_as_sf(ValidSY, coords = c("Var1", "Var2"), crs = 4326)
+ppl <- st_as_sf(ValidSYl, coords = c("Var1", "Var2"), crs = 4326)
 ppl <- st_transform(ppl, crs = 3035)
 ggplot(basemap) +
   geom_sf(fill="gray95", color=NA) +
@@ -428,10 +464,10 @@ ggsave(paste0("Plots/",scplot,".jpg"), width=20, height=15, units=c("cm"),dpi=15
 
 ## Figure 6: Spatial skill plots -------------------------
 
-kgefile="out/EFAS_obs_kgeAY.csv"
-corrfile="out/EFAS_obs_corr_PearsonAY.csv"
-biasfile="out/EFAS_obs_biasAY.csv"
-varfile="out/EFAS_obs_variabilityAY.csv"
+kgefile="out/EFAS_obs_kgeAY2.csv"
+corrfile="out/EFAS_obs_corr_PearsonAY2.csv"
+biasfile="out/EFAS_obs_biasAY2.csv"
+varfile="out/EFAS_obs_variabilityAY2.csv"
 
 
 ##Add the skills for logged data
@@ -444,11 +480,11 @@ varfile="out/EFAS_obs_sqrtvariabilityAY.csv"
 
 
 
-kge=SpatialSkillPlot(ValidSY,"kge",kgefile)[[1]]
+kge=SpatialSkillPlot(ValidSYl,"kge",kgefile)[[1]]
 median(kge$skill)
 quantile(kge$skill,c(0.25,0.5,0.75))
 corr=SpatialSkillPlot(ValidSY,"r",corrfile)[[1]]
-bias=SpatialSkillPlot(ValidSY,"b",biasfile)[[1]]
+bias=SpatialSkillPlot(ValidSYl,"b",biasfile)[[1]]
 median(bias$skill)
 bg=kge[which(kge$skill<=-0.41),]
 
@@ -466,20 +502,20 @@ kgeout <- st_transform(kgeout, crs = 3035)
 
 Plots=FALSE
 if (Plots=TRUE){
-  kgep=SpatialSkillPlot(ValidSY,"kge",kgefile)
-  kgep[[1]]
-  corr=SpatialSkillPlot(ValidSY,"r",corrfile)
+  kgep=SpatialSkillPlot(ValidSYl,"kge",kgefile)
+  kgep[[2]]
+  corr=SpatialSkillPlot(ValidSYl,"r",corrfile)
   corr[[2]]
-  biasp=SpatialSkillPlot(ValidSY,"b",biasfile)
+  biasp=SpatialSkillPlot(ValidSYl,"b",biasfile)
   biasp[[2]]
-  varp=SpatialSkillPlot(ValidSY,"v",varfile)
+  varp=SpatialSkillPlot(ValidSYl,"v",varfile)
   varp[[2]]
 
   if (sqval==F){
-    ggsave("Plots/Validation_KGE.jpg", kgep.width=20, height=20, units=c("cm"),dpi=1500)
-    ggsave("Plots/Validation_corr.jpg",  corr[[2]], width=20, height=20, units=c("cm"),dpi=1500)
-    ggsave("Plots/Validation_bias.jpg",  biasp[[2]], width=20, height=20, units=c("cm"),dpi=1500)
-    ggsave("Plots/Validation_var.jpg",  varp[[2]], width=20, height=20, units=c("cm"),dpi=1500)
+    ggsave("Plots/Validation_KGE2.jpg", kgep[[2]],width=20, height=20, units=c("cm"),dpi=1500)
+    ggsave("Plots/Validation_corr2.jpg",  corr[[2]], width=20, height=20, units=c("cm"),dpi=1500)
+    ggsave("Plots/Validation_bias2.jpg",  biasp[[2]], width=20, height=20, units=c("cm"),dpi=1500)
+    ggsave("Plots/Validation_var2.jpg",  varp[[2]], width=20, height=20, units=c("cm"),dpi=1500)
   }
   if (sqval==T){
     ggsave("Plots/Validation_KGE_sqrt.jpg", kgep[[2]],width=20, height=20, units=c("cm"),dpi=1500)
@@ -738,6 +774,81 @@ p4<-ggplot(ValidSYp, aes(x=factor(res.group), y=skill)) +
         legend.key.size = unit(.8, "cm"))
 
 ggsave("Plots/boxp_KGE_reservoirs.jpg", p4, width=20, height=15, units=c("cm"),dpi=1500)
+
+
+
+
+### Boxplot of performance by calibration groups -----------------
+#groups= 100-1000 1000-10000 10000-100000 100000-10000000
+
+ValidSY=kgep[[1]]
+ValidSY$carea="calibrated"
+
+#can also be regio or endo
+
+#From domain_calib.R
+
+llreg=unique(anog$latlong)
+ValidSY$latlong=paste(ValidSY$Var1,ValidSY$Var2,sep=" ")
+bjr=which(!is.na(match(ValidSY$latlong,llreg)))
+
+ValidSY$carea[bjr]="regio"
+
+ValidSY$Calgroup=2
+ValidSY$Calgroup[which(ValidSY$csource=="EFAS")]=3
+ValidSY$Calgroup[which(ValidSY$calib==T)]=4
+ValidSY$Calgroup[which(ValidSY$carea=="regio")]=1
+
+
+
+agCa=aggregate(list(cav=ValidSY$UpA),
+                by = list(upa=ValidSY$Calgroup),
+                FUN = function(x) c(length(x)))
+
+median(ValidSY$UpA)
+meds <- c(by(ValidSY$skill, ValidSY$Calgroup, median))
+q <- c(by(ValidSY$skill, ValidSY$Calgroup, quantile))
+merdecol=match(ValidSY$Calgroup,names(meds))
+ValidSY$col=meds[merdecol]
+palet=c(hcl.colors(9, palette = "Blues", alpha = NULL, rev = T, fixup = TRUE))
+
+p1<-ggplot(ValidSY, aes(x=factor(Calgroup), y=skill)) +
+  geom_boxplot(notch=F,position=position_dodge(.9),alpha=.8,aes(fill=col),linewidth=0.8,outlier.alpha = 0.4)+
+  scale_y_continuous(limits = c(-0.5,1),name="KGE",breaks = seq(-1,1,by=0.5),minor_breaks = seq(-1,1,0.1))+
+  scale_x_discrete(labels=c("1" = "regionalized parameters", "2" = "calibrated domain",
+                            "3" = "claibrated domain and in EFAS","4" = "calibrated stations"),
+                            name="Calibration status")+
+  scale_fill_gradientn(
+    colors=palet, n.breaks=6,limits=c(0.4,0.8)) +
+  geom_text(data=data.frame(), aes(x=names(meds), y=meds-0.05, label=agCa$cav), col='black', size=4,fontface="bold")+
+  theme(axis.title=element_text(size=16, face="bold"),
+        axis.text = element_text(size=12),
+        panel.background = element_rect(fill = "white", colour = "white"),
+        panel.grid = element_blank(),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=14),
+        legend.text = element_text(size=12),
+        legend.position = "none",
+        panel.grid.major = element_line(colour = "grey60"),
+        panel.grid.minor.y = element_line(colour = "grey80",linetype="dashed"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))
+
+
+p1
+
+#to be continued... with a map identifying each station. Ager this do the timing diff maps and voila
+
+
+ggsave("Plots/boxplot_KGExxxx.jpg", p1, width=20, height=15, units=c("cm"),dpi=1500)
+
+
+
+
+
+
+
+
 
 ## Figure 9: Performance on annual maxima and minima timings-----------------------
 Q_data <- read.csv(paste0('Q_19502020.csv'), header = F)  # CSVs with observations
