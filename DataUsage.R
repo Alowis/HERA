@@ -112,7 +112,7 @@ for (ir in 1:length(Allriver)){
   Cairo::Cairo(
     20, #length
     15, #width
-    file = paste("Regimes/",catch, ".png", sep = ""),
+    file = paste("Regimes/",catch, "v2.png", sep = ""),
     type = "png", #tiff
     bg = "transparent", #white or transparent depending on your requirement 
     dpi = 300,

@@ -461,6 +461,7 @@ SpatialSkillPlot<-function(points,metric,inputfile){
   
   myfile=inputfile
   skill=read.csv(paste0(valid_path,myfile))
+  if (length(skill[1,])==3) skill=skill[,-1]
   if (length(skill[1,])>2){
     years=c(1950:2020)
     skill=skill[-73]
@@ -534,22 +535,23 @@ SpatialSkillPlot<-function(points,metric,inputfile){
     tsize=size=12
     map=ggplot(basemap) +
       geom_sf(fill="gray95", color=NA) +
-      geom_sf(data=parpl,aes(geometry=geometry),col="black",alpha=1,size=1.4,stroke=0.05,shape=1)+ 
-      geom_sf(data=parpl,aes(geometry=geometry,colour=factor(kgecode)),alpha=.9,size=1.4,stroke=0,shape=16)+ 
-      geom_sf(data=parpef,aes(geometry=geometry),col="black",alpha=1,size=1.4,stroke=0.1,shape=8)+ 
+      geom_sf(data=parpl,aes(geometry=geometry,colour=factor(kgecode),size=UpA),alpha=.7,stroke=0,shape=16)+ 
+      geom_sf(data=parpl,aes(geometry=geometry,size=UpA),col="grey20",alpha=1,stroke=0.05,shape=1)+ 
+      #geom_sf(data=parpef,aes(geometry=geometry),col="black",alpha=1,size=1.4,stroke=0.1,shape=8)+ 
       geom_sf(fill=NA, color="grey20") +
       scale_x_continuous(breaks=seq(-30,40, by=5)) +
+      scale_size(range = c(1, 3), trans="sqrt")+
       labs(x="Longitude", y = "Latitude")+
       coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
-      scale_color_manual(values = colorz, labels= kgelabs, name="KGE")   +
+      scale_color_manual(values = colorz, labels= kgelabs, name="KGE'")   +
       labs(x="Longitude", y = "Latitude") +
-      guides(colour = guide_legend(override.aes = list(size = 4)))+
+      guides(colour = guide_legend(override.aes = list(size = 8,shape=15), reverse=T), size = "none")+
       theme(axis.title=element_text(size=tsize),
             panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
             panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
             legend.title = element_text(size=tsize),
             legend.text = element_text(size=osize),
-            legend.position = "bottom",
+            legend.position = "right",
             panel.grid.major = element_line(colour = "grey85",linetype="dashed"),
             panel.grid.minor = element_line(colour = "grey90"),
             legend.key = element_rect(fill = "transparent", colour = "transparent"),
@@ -559,16 +561,16 @@ SpatialSkillPlot<-function(points,metric,inputfile){
     #plot for correlation even if called skill
     map=ggplot(basemap) +
       geom_sf(fill="gray95", color=NA) +
-      geom_sf(data=parpl,aes(geometry=geometry,fill=skill,size=UpA),color="transparent",alpha=.9,shape=21,stroke=0)+ 
+      geom_sf(data=parpl,aes(geometry=geometry,fill=skill,size=UpA),color="transparent",alpha=.7,shape=21,stroke=0)+ 
+      geom_sf(data=parpl,aes(geometry=geometry,size=UpA),col="grey20",alpha=1,stroke=0.05,shape=1)+ 
       geom_sf(fill=NA, color="grey20") +
-      geom_sf(data=parpl,aes(geometry=geometry,size=UpA),col="black",alpha=1,stroke=0.1,shape=1)+ 
       scale_x_continuous(breaks=seq(-30,40, by=5)) +
       scale_size(range = c(1, 3), trans="sqrt")+
       scale_fill_gradientn(
         colors=palet,n.breaks=5,oob = scales::squish, limits=limi, name=metric) +
       coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
       labs(x="Longitude", y = "Latitude") +
-      guides(fill = guide_colourbar(barwidth = 0.5, barheight = 12,reverse=F))+
+      guides(fill = guide_colourbar(barwidth = 0.5, barheight = 12,reverse=F),size="none")+
       theme(axis.title=element_text(size=tsize),
             panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
             panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
@@ -1002,14 +1004,15 @@ plotQj <- function(data,catch,UpAloc){
   ## Suppression des lignes sans couples Qobs/Qsim
   data <- subset( data, !is.na(Q1) & !is.na(Q2))
   ## Preparation de la sequence de mois
-  mois.deb <-  seq(as.Date("1950-01-01"), by="month", length=12)
+  mois.deb <-  seq(as.Date("1950-01-15"), by="month", length=12)
   ## Vecteur de catÃ©gories
   period1=paste0(format(range(data$date1)[1],"%Y"),"-",format(range(data$date1)[2],"%Y"))
   period2=paste0(format(range(data$date2)[1],"%Y"),"-",format(range(data$date2)[2],"%Y"))
   print(period2)
   n.area=UpAloc
   name.riv=catch
-  main = bquote(.(name.riv)~ " Regime (Area="~.(n.area)~ km^2~") | Periods: "~ .(period1) ~" vs" ~ .(period2))
+  #main = bquote(.(name.riv)~ " Regime (Area="~.(n.area)~ km^2~") | Periods: "~ .(period1) ~" vs" ~ .(period2))
+  main = bquote(.(name.riv)~ " Regime (Area="~.(n.area)~ km^2~")")
   ## Suppression des lignes sans couples Qobs/Qsim
   ## Preparation de la sequence de mois
   jours <- as.numeric(format(data$date1,"%j"))
@@ -1031,13 +1034,14 @@ plotQj <- function(data,catch,UpAloc){
   
   ## ParamÃ©tres graphiques
   plot(Qc$date, Qc$obs, type="n", axes=FALSE, ylim=qlim,xaxs="i",yaxs="i",
-       xlab = NA, ylab = expression(paste("Q (",m^3/s,")")))
-  mtext(main,3,font = 2,line = 0.5,cex = .75)
+       xlab = NA, ylab="")
+  mtext(main,3,font = 2,line = 0.5,cex = 1.5)
   abline(v = format(mois.deb,"%j"), col="lightgrey", lty=2)
   lines(Qc$date, Qc$obs, col="blue",lwd=2)
   lines(Qc$date, Qc$sim, col="red",lwd=2)
-  axis(2)
-  axis(1, format(mois.deb,"%j"), label=format(mois.deb,"%b"),cex.axis=.8)
+  axis(2,cex.axis=1)
+  title(ylab = expression(paste("Q (",m^3/s,")")),cex.lab=1.5,line=2)
+  axis(1, format(mois.deb,"%j"), label=format(mois.deb,"%b"),cex.axis=1)
   box()
   polygon(c(Qc$date,rev(Qc$date)),c(Qc$q25o,rev(Qc$q75o)),
           col=alpha("lightblue",.3),border="transparent")
@@ -1054,7 +1058,7 @@ plotQj <- function(data,catch,UpAloc){
   ## Definition de la legende
   legend("topleft", leg=c("1990-2020","1951-1981","deviation"),
          lwd=c(2,2,1,2), col=c("red","blue","grey"),
-         cex=.8, lty=c(1,1,2,1), bg=alpha("white",.6))
+         cex=1.2, lty=c(1,1,2,1), bg=alpha("white",.6))
   #return(Qc)
 } 
 

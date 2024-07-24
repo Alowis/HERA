@@ -30,7 +30,7 @@ for (y in yrlist){
   Q_s <- Q_d[-1, ]
   Q_sim=rbind(Q_sim,Q_s)
 }
-write.csv(Q_sim,file="out/HERA_Val_19502020.csv")
+#write.csv(Q_sim,file="out/HERA_Val_19502020.csv")
 
 # Part 1: Create the Valid station file -------------------------------------------
 
@@ -117,12 +117,12 @@ match(mHM_sta$filename,name_vector)
 ### Figure S2.a Map of upstream area--------------------------------------
 #Plot parameters
 
-ValidSf=read.csv(file="Stations/Stations_Validation.csv")[,-1]
+ValidSf=read.csv(file="Stations/Stations_ValidationF.csv")[,-1]
 ValidSY=ValidSf[which(ValidSf$removal!="YES"),]
 
-ValidSY$Rlenyr=ValidSY$Rlen/365.25
+ValidSY$Rlenyr=ValidSY$Rlen/365
 ValidSY=ValidSY[-which(ValidSY$Rlenyr<30),]
-
+ValidSY$UpA=ValidSY$upa
 cord.dec=ValidSY[,c(1,2)]
 cord.dec = SpatialPoints(cord.dec, proj4string=CRS("+proj=longlat"))
 cord.UTM <- spTransform(cord.dec, CRS("+init=epsg:3035"))
@@ -172,13 +172,13 @@ ggplot(basemap) +
 
 #match with distance between points and upstream area
 ## Distance between "official gauges" and efas points -----------------------
-hera=ValidSY[,c(1,2,8)]
+hera=ValidSY[,c(1,2,3)]
 heraloc=st_as_sf(hera, coords = c("Var1", "Var2"), crs = 4326)
 mhml=mHM_sta[,c(3,2,4)]
 mhmloc=st_as_sf(mhml, coords = c("LON", "LAT"), crs = 4326)
 dist=c()
 mlm=c()
-for (r in 1:length(heraloc$UpA)){
+for (r in 1:length(heraloc$upa)){
   cat(paste0(r,"\n"))
   v1=heraloc[r,]
   v2=mhmloc
@@ -311,7 +311,15 @@ vecto=which(!is.na((match(name_vector,finalcom_upaclean$filename))))
 name_vector2=name_vector[vecto]
 mhm_dis2=mHM_dis[,vecto]
 #load lisflood discharge
-HERA_Q=read.csv(file=paste0(valid_path,"out/HERA_Val_19502020.csv"))
+## HERA loading ---------------------
+HERA_data<-read.csv(file="out/HERA_Val2_19502020.csv")
+HERA_cordata<-read.csv(file="out/HERA_CorStat_19502020.csv")
+
+replax=match(as.numeric(HERA_cordata[1,]),as.numeric(HERA_data[1,]))[-1]
+HERA_data[,replax]=HERA_cordata[,-1]
+
+date2=seq(as.Date("1950-01-04"),as.Date("2020-12-31"),by="days")
+
 obs_Q=read.csv(file=paste0(valid_path,"Q_19502020.csv"))
 
 Q_data=obs_Q[,-1]
@@ -336,7 +344,7 @@ ValidSta$Rlen=RecordLen$lR[lr2]/365.25
 plot(ValidSta$Rlen[order(ValidSta$Rlen)])
 
 date_vector2=seq(as.Date("1950-01-04"),as.Date("2020-12-31"),by="days")
-
+HERA_Q=HERA_data
 HERA_ID=HERA_Q[1,]
 Q_ID=obs_Q[1,]
 id_match=final_dsetmatch$V1
@@ -475,7 +483,7 @@ skillv=data.frame(skillv,skills_hera_c)
 skillv$class="HERA"
 #I want as many stations from mhm run
 skillm=ValidSY[valid,]
-valid3=na.omit((match(skillm$V1,skills_mhm_c[,1])))
+valid2=na.omit((match(skillm$V1,skills_mhm_c[,1])))
 skillm=data.frame(skillm,skills_mhm_c[valid2,])
 
 skillm$class="mHM"
@@ -532,7 +540,7 @@ p1<-ggplot(points2, aes(x=factor(class), y=V2)) +
 p1
 
 
-ggsave("Revisions/boxplot_KGE_comp.jpg", p1, width=15, height=20, units=c("cm"),dpi=1500)
+ggsave("Revisions/boxplot_KGE_compF.jpg", p1, width=15, height=20, units=c("cm"),dpi=500)
 
 
 
@@ -545,12 +553,51 @@ hera_vs_mhm$RlenYr=hera_vs_mhm$Rlen/366
 
 points=skillv
 skillm=as.data.frame(skillm)
-metric="kge"
+metric="KGE"
 #For correlation
 if (metric=="r"){
   palet=c(hcl.colors(9, palette = "YlGnBu", alpha = NULL, rev = T, fixup = TRUE))
-  limi=c(0,1)
+  limi=c(-1,1)
   var="r"
+  
+  parpl <- st_as_sf(points, coords = c("Var1", "Var2"), crs = 4326)
+  parpl <- st_transform(parpl, crs = 3035)
+  parpef=parpl[which(parpl$calib==TRUE),]
+  tsize=size=12
+  palet=c(hcl.colors(9, palette = "RdYlBu", alpha = NULL, rev = F, fixup = TRUE))
+  limi=c(-0.25,0.25)
+  metric="r (HERA) - r (mHM)"
+  
+  points$rdiff=points$r-skillm$r
+  parpl <- st_as_sf(points, coords = c("Var1", "Var2"), crs = 4326)
+  parpl <- st_transform(parpl, crs = 3035)
+  map3=ggplot(basemap) +
+    geom_sf(fill="gray95", color=NA) +
+    geom_sf(data=parpl,aes(geometry=geometry,fill=rdiff,size=UpA),color="transparent",alpha=.9,shape=21,stroke=0)+ 
+    geom_sf(fill=NA, color="grey20") +
+    geom_sf(data=parpl,aes(geometry=geometry,size=UpA),col="black",alpha=1,stroke=0.1,shape=1)+ 
+    scale_x_continuous(breaks=seq(-30,40, by=5)) +
+    scale_size(range = c(1, 3), trans="sqrt",guide = 'none')+
+    scale_fill_gradientn(
+      colors=palet,n.breaks=5,oob = scales::squish, limits=limi, name=metric) +
+    coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+    ggtitle (paste0("Comparison of HERA and mHM run \nfor the period 1960-2010 over n = ",length(points2$Var1)/2," European stations"))+
+    labs(x="Longitude", y = "Latitude") +
+    guides(fill = guide_colourbar(barwidth = 24, barheight = 0.5,reverse=F, title.position = "top"))+
+    theme(axis.title=element_text(size=tsize),
+          panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+          panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+          legend.title = element_text(size=tsize,hjust = 0.5, vjust = 1),
+          legend.text = element_text(size=osize),
+          legend.position = "bottom",
+          panel.grid.major = element_line(colour = "grey85",linetype="dashed"),
+          panel.grid.minor = element_line(colour = "grey90"),
+          legend.key = element_rect(fill = "transparent", colour = "transparent"),
+          legend.key.size = unit(.8, "cm"))
+  map3
+  
+  ggsave("Revisions/r_mHMvsHERA_final.jpg", map3, width=15, height=20, units=c("cm"),dpi=500)
+  
 }
 #For Bias
 if (metric=="b"){
@@ -643,7 +690,7 @@ if (metric=="kge"){
   
   
   palet=c(hcl.colors(9, palette = "RdYlBu", alpha = NULL, rev = F, fixup = TRUE))
-  limi=c(-0.5,0.5)
+  limi=c(-0.2,0.2)
   metric="KGE'(HERA) - KGE'(mHM)"
   
   points$kgediff=points$skill-points$KGE
@@ -674,12 +721,12 @@ if (metric=="kge"){
           legend.key.size = unit(.8, "cm"))
   map3
   
-  ggsave("Revisions/KGE_mHMvsHERA_final.jpg", map3, width=15, height=20, units=c("cm"),dpi=1500)
+  ggsave("Revisions/KGE_mHMvsHERA_finalF.jpg", map3, width=15, height=20, units=c("cm"),dpi=1500)
   
 }
 
 #Do a histogram with orderer difference
-points$skill=points$V2
+#points$skill=points$r
 points$skill=as.numeric(points$skill)
 points$KGE=skillm$V2
 points$kgediff=points$skill-points$KGE
@@ -714,7 +761,7 @@ px=ggplot(Recap) +
         legend.key = element_rect(fill = "transparent", colour = "transparent"),
         legend.key.size = unit(.8, "cm"))
 px
-ggsave("Revisions/diff_KGE_hera-mhm.jpg", px, width=10, height=20, units=c("cm"),dpi=1500)
+ggsave("Revisions/diff_KGE_hera-mhmF.jpg", px, width=10, height=20, units=c("cm"),dpi=1500)
 dev.off()
 
 
@@ -787,7 +834,7 @@ pl=ggplot(Recap) +
         legend.key.size = unit(.8, "cm"))
 pl
 
-ggsave(paste0("Revisions/diff_",var,"_hera-mhm.jpg"), pl, width=10, height=20, units=c("cm"),dpi=1500)
+ggsave(paste0("Revisions/diff_",var,"_hera-mhmF.jpg"), pl, width=10, height=20, units=c("cm"),dpi=1500)
 
 plot(points$UpA,points$kgediff, log="x")
 #deeper analysis about where most performance difference is found
@@ -820,14 +867,15 @@ p<-ggplot(ecdf_all) +
   scale_color_manual(name= "Run",values=c("red","darkgrey"))+
   scale_y_continuous(name="ECDF",breaks = c(0,0.2,.4,.6,.8,1))+
   scale_x_continuous(name="KGE'",limit=c(-0.5,1), breaks=seq(-1,1,by=0.2)) +
+  guides(colour = guide_legend(override.aes = list(size = 6)))+
   # scale_x_discrete(labels= c("< -0.41","-0.41-0.2", "0.2-0.5","0.5-0.7","0.7-0.8", ">0.8"), name="KGE")+
-  theme(axis.title=element_text(size=16, face="bold"),
-        axis.text = element_text(size=13),
+  theme(axis.title=element_text(size=18, face="bold"),
+        axis.text = element_text(size=16),
         panel.background = element_rect(fill = "white", colour = "white"),
         panel.grid = element_blank(),
         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-        legend.title = element_text(size=14),
-        legend.text = element_text(size=12),
+        legend.title = element_text(size=20),
+        legend.text = element_text(size=18),
         legend.position = "bottom",
         panel.grid.major = element_line(colour = "grey80"),
         panel.grid.minor.x = element_line(colour = "grey90",linetype="dashed"),
@@ -835,7 +883,7 @@ p<-ggplot(ecdf_all) +
         legend.key.size = unit(.8, "cm"))
 
 p
-ggsave("KGE_comp_HERA-mHM.jpg", p, width=20, height=15, units=c("cm"),dpi=1500)
+ggsave("Revisions/KGE_comp_HERA-mHMF.jpg", p, width=20, height=15, units=c("cm"),dpi=500)
 mean(points$KGE)
 mean(points$skill)
 
@@ -923,3 +971,7 @@ qplot=Q_all[which(year(Q_all$time)==myy),]
 plot(qplot,col=3,type="o")
 points(hplot,col=2,type="o")
 points(mhm_all,col=4,type="o")
+
+
+
+#### SUMMARY maps of water abstraction, evapotranspiration and precipitation every year
