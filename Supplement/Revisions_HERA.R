@@ -15,6 +15,7 @@ valid_path = paste0(main_path,'DataPaper/')
 dis_path<-paste0(main_path,'dis/calibrated/filtered/Histo/')
 setwd(valid_path)
 
+hydroDir<-("D:/tilloal/Documents/06_Floodrivers/DataPaper/")
 
 # Data generation -----------------------------
 #Load all Q_EFAS (HERA simulated discharge) and create a single file
@@ -231,11 +232,11 @@ pp_match <- st_as_sf(finalcom_upaclean, coords = c("Var1", "Var2"), crs = 4326)
 pp_match <- st_transform(pp_match, crs = 3035)
 
 m1=ggplot(basemap) +
-  geom_sf(fill="gray95", color=NA) +
+  geom_sf(fill="gray95", color="black") +
   geom_sf(data=ppl,aes(geometry=geometry,size=UpA,shape="H"),color="royalblue",fill="transparent",alpha=.8,stroke=0)+ 
   geom_sf(data=mHM,aes(geometry=geometry,size=Area_given_km2,shape="m"),color="red",fill="transparent",alpha=.9,stroke=0)+ 
   geom_sf(data=pp_match,aes(geometry=geometry,size=Area_given_km2,shape="ma"),color="black",fill="transparent",alpha=.9,stroke=0)+ 
-  geom_sf(fill=NA, color="grey20") +
+  #geom_sf(fill=NA, color="grey20") +
   scale_x_continuous(breaks=seq(-30,40, by=5)) +
   scale_size(range = c(1, 4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
                                                                   sep = " ")),
@@ -489,7 +490,70 @@ skillm=data.frame(skillm,skills_mhm_c[valid2,])
 skillm$class="mHM"
 
 
+#redo the matching map
 
+
+#add river network
+outletname="efas_rnet_100km_01min"
+
+outriver=outletopen(hydroDir,outletname)
+outR <- st_as_sf(outriver, coords = c("Var1", "Var2"), crs = 4326)
+outR <- st_transform(outR, crs = 3035)
+
+
+#Plot with the matching points
+pp_match <- st_as_sf(skillm, coords = c("Var1", "Var2"), crs = 4326)
+pp_match <- st_transform(pp_match, crs = 3035)
+tsize=20
+osize=18
+m1=ggplot(basemap) +
+  geom_sf(fill="gray95", color="black") +
+  geom_sf(data=outR,aes(geometry=geometry),color="gray20",alpha=.9,shape=15,stroke=0, size=0.1)+ 
+  geom_sf(data=ppl,aes(geometry=geometry,size=UpA,shape="H"),color="royalblue",fill="transparent",alpha=.6,stroke=0.1)+ 
+  geom_sf(data=mHM,aes(geometry=geometry,size=Area_given_km2,shape="m"),color="red",fill="transparent",alpha=.9,stroke=0.2)+ 
+  geom_sf(data=pp_match,aes(geometry=geometry,size=upa,shape="ma"),color="black",fill="transparent",alpha=.9,stroke=0.2)+ 
+  #geom_sf(fill=NA, color="grey20") +
+  scale_x_continuous(breaks=seq(-30,40, by=5)) +
+  scale_size(range = c(1, 4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
+                                                                  sep = " ")),
+             breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"))+
+  scale_fill_gradientn(
+    colors=palet,oob = scales::squish, name="record length (years)", trans="sqrt",
+    breaks=c(30,40,50,60,70)) +
+  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+  labs(x="Longitude", y = "Latitude") +
+  scale_color_manual(name="Legend:",
+                     values = c("royalblue", "red","black"),
+                     labels = c("HERA", "mHM", "match")) +
+  scale_shape_manual(name="River stations:",
+                     values = c("H" = 19, "m" = 1, "ma" = 8),
+                     labels = c(paste0("HERA (n=",length(ValidSY$V1),")"), 
+                                paste0("mHM (n=",length(mHM_sta$filename),")"), 
+                                paste0("match (n=",length(skillm$V1),")"))) +
+  # guides(fill = guide_colourbar(barwidth = 20, barheight = 0.5,reverse=F),
+  # size= guide_legend(override.aes = list(fill = "grey50")))+
+  guides(fill = "none",
+         size= "none",
+         shape = guide_legend(override.aes = list(size = 6, stroke=0.8)))+
+  theme(axis.title=element_text(size=tsize),
+        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=tsize),
+        legend.text = element_text(size=osize),
+        legend.position = "right",
+        legend.box = "vertical",
+        panel.grid.major = element_line(colour = "grey85",linetype="dashed"),
+        panel.grid.minor = element_line(colour = "grey90"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))
+
+
+m1
+ggsave("Revisions/mapCF.jpg", m1,width=30, height=20, units=c("cm"),dpi=500)
+
+
+median(skillv$V2)
+median(skillm$V2)
 #Now 2 boxplots and goodbye
 
 points2=rbind(skillv,skillm)
@@ -735,6 +799,7 @@ Recap=points
 Recap=Recap[order(Recap$kgediff),]
 Recap$ord=c(1:length(Recap$Var1))
 plot(Recap$skill[Recap$ord])
+length(which(Recap$kgediff>0))/length(Recap$Var2)
 # Recap <- Recap %>% 
 #   mutate(mycolor = ifelse(kgediff>0, "type1", "type2"))
 # 
