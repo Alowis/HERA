@@ -1,11 +1,11 @@
 # ==============================================================================
 # Title: Creation of the validation metrics and plots of the HERA dataset, linked to the article:  
-# HERA: a high-resolution pan-European hydrological reanalysis (1950-2020)
+# HERA: a high-resolution pan-European hydrological reanalysis (1951-2020)
 # Author: Alois Tilloy - Joint Research Centre - Unit C6 
 # Date: 2024 -02 -01 
 # Description:
-#   This script allows to generate plots  and assess the skills of the HERA dataset against
-#   observed discharge data from 2901 river gauges across Europe
+#   This script allows to generate plots  and assess the skills of the HERA dataset
+#   and the mHM run against observed discharge data from 2448 river gauges across Europe
 # ==============================================================================
 
 source("~/06_Floodrivers/DataPaper/Code/HERA/functions.R")
@@ -1016,53 +1016,3 @@ ggplot(ecdf_all) +
         legend.key = element_rect(fill = "transparent", colour = "transparent"),
         legend.key.size = unit(.8, "cm"))
 
-
-
-#Other stuff-----------------------
-idch=6335156
-
-#compare dicharge from HERA ncdf with the one saved
-yr=2000
-HERA_fold=paste0(main_path,"HERA")
-filename=paste0("dis.HERA_",yr)
-#choose location
-x=6935065
-loca=which(corf$V1==x)
-
-HERA_Q1=disNcopenloc(fname=filename,dir=HERA_fold,outloc=corf,idc=loca)
-HERA_Q1$t2=as.POSIXct(HERA_Q1$time*24*3600,origin = "1979-01-01 00:00:00")
-
-
-
-id_HERA=match(x,HERA_ID)
-HERA_loc=HERA_Q[-1,id_HERA]
-plot(HERA_loc)
-
-Selected_river=finalcom_upaclean[match(x,finalcom_upaclean$V1),]
-id_mhm=Selected_river$filename
-mhmcol=match(id_mhm,name_vector)
-mhm_loc=mHM_dis[-1,mhmcol]
-plot(mhm_loc)
-mhm_all=data.frame(time=date_vector,Q=as.numeric(mhm_loc))
-#add date to HERA dischare
-
-heradate=date_vector2
-HERA_all=data.frame(time=heradate,Q=HERA_loc)
-myy=1990
-hplot=HERA_all[which(year(HERA_all$time)==myy),]
-plot(as.POSIXct(hplot$time),hplot$Q,type="o")
-
-
-#now add observed dataset
-id_obs=match(x,Q_ID)
-Q_loc=obs_Q[-1,id_obs]
-Q_all=data.frame(time=date_vector2,Q=Q_loc[-c(1:3)])
-qplot=Q_all[which(year(Q_all$time)==myy),]
-
-plot(qplot,col=3,type="o")
-points(hplot,col=2,type="o")
-points(mhm_all,col=4,type="o")
-
-
-
-#### SUMMARY maps of water abstraction, evapotranspiration and precipitation every year

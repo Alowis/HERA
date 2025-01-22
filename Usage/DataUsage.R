@@ -1,6 +1,6 @@
 # ==============================================================================
 # Title: Creation of the plots of the Usage note section of the article:  
-# HERA: a high-resolution pan-European hydrological reanalysis (1950-2020)
+# HERA: a high-resolution pan-European hydrological reanalysis (1951-2020)
 # Author: Alois Tilloy - Joint Research Centre - Unit C6 
 # Date: 2024 -02 -01 
 # Description:

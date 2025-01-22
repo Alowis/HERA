@@ -1,3 +1,12 @@
+# ==============================================================================
+# Title: Plot of the calibrated domain of the HERA dataset, linked to the article:  
+# HERA: a high-resolution pan-European hydrological reanalysis (1951-2020)
+# Author: Alois Tilloy - Joint Research Centre - Unit C6 
+# Date: 2024 -02 -01 
+# Description:
+#   This script generates a plot of the calibrated domain of HERA (See article supplement)
+# ==============================================================================
+
 #script to identify how much of HERA has been calibrated
 library(rgdal)
 library(raster)
