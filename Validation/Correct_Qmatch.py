@@ -39,39 +39,6 @@ efm_ID=stat_efasmatch[:,0]
 stations_GRDC = pd.read_excel('GRDC_Stations.xlsx').values
 grdc_ID=stations_GRDC[:,0].astype("int64")
 
-# corr_all = np.full([Station_IDs.size,len(years)+2],np.inf)
-# corr_all[:,0] = Station_IDs
-
-# kge_all = np.full([Station_IDs.size,len(years)+2],np.inf)
-# kge_all[:,0] = Station_IDs
-
-# bias_all = np.full([Station_IDs.size,len(years)+2],np.inf)
-# bias_all[:,0] = Station_IDs
-
-# var_all = np.full([Station_IDs.size,len(years)+2],np.inf)
-# var_all[:,0] = Station_IDs
-
-# median_sim = np.full([Station_IDs.size,len(years)+2],np.inf)
-# median_sim[:,0] = Station_IDs
-# median_obs = np.full([Station_IDs.size,len(years)+2],np.inf)
-# median_obs[:,0] = Station_IDs
-
-# q1_sim = np.full([Station_IDs.size,len(years)+2],np.inf)
-# q1_sim[:,0] = Station_IDs
-# q1_obs = np.full([Station_IDs.size,len(years)+2],np.inf)
-# q1_obs[:,0] = Station_IDs
-
-# max_sim = np.full([Station_IDs.size,len(years)+2],np.inf)
-# max_sim[:,0] = Station_IDs
-# max_obs = np.full([Station_IDs.size,len(years)+2],np.inf)
-# max_obs[:,0] = Station_IDs
-
-
-# q2_sim = np.full([Station_IDs.size,len(years)+2],np.inf)
-# q2_sim[:,0] = Station_IDs
-# q2_obs = np.full([Station_IDs.size,len(years)+2],np.inf)
-# q2_obs[:,0] = Station_IDs
-
 #load the csv on matches to avoid spatial match on these stations
 stat_corect = pd.read_csv('corrected_locations.csv').values
 Station_IDs=stat_corect[:,0]

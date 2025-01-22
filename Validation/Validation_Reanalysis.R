@@ -250,7 +250,7 @@ Mancheck_in=ValidSf[which(ValidSf$flagP==1),]
 
 #plot problematic stations
 Q_sim=read.csv(file="out/HERA_Val2_19502020.csv")
-Q_sold=read.csv(file="out/HERA_Val_19502020.csv")
+#Q_sold=read.csv(file="out/HERA_Val_19502020.csv")
 range=c(10500:13700)
 Qplot=as.numeric(Q_data[,which(Q_data[1,]=="6335040")][-c(1:4)])
 Qplot[which(Qplot==0)]=NA
@@ -367,9 +367,113 @@ length(which(ValidSY$Rlen<(30*365)))
 ValidSYl=ValidSY[which(ValidSY$Rlen>(30*365)),]
 
 length(ValidSYl$Var1[which(ValidSYl$upa<200)])
+
+
+
+Q_data <- read.csv(paste0('out/Q_19502020.csv'), header = F)  # CSVs with observations
+time=as.Date(as.numeric(Q_data$V2)-1,origin="0000-01-01")[-c(1,2)]
+Q_data=Q_data[-1,-1]
+Station_data_IDs <- as.vector(t(Q_sim[1, -1]))
+Station_obs_IDs <- as.numeric(as.vector(t(Q_data[1, -1])))
+skills_cor=c()
+for (s in 1:length(Station_data_IDs)){
+  id_HERA=s
+  Station=Station_data_IDs[s]
+  # Station="6139261"
+  # s=which(Station_data_IDs==Station)
+  id_obs=match(Station,Station_obs_IDs)
+  Station_obs_IDs[id_obs]
+  uparea=ValidSYl$upa[which(ValidSYl$V1==Station)]
+  if (length(uparea)>0){
+  print(s)
+  HERA_loc=Q_sim[-1,s+1]/uparea
+  Q_loc=as.numeric(Q_data[-c(1:4),id_obs+1])/uparea
+  plot(Q_loc)
+  #normalize Qsim
+  if (length(which(is.na(HERA_loc)))>0){
+    kikou=orderNorm(HERA_loc[-which(is.na(HERA_loc))])
+  } else{kikou=orderNorm(HERA_loc)}  
+  Err_add=Q_loc-HERA_loc
+  
+  #Err_mul=Q_loc/HERA_loc
+  #plot(log(HERA_loc),log(Err_mul))
+  #normalize Err
+  if (length(which(is.na(HERA_loc)))>0) {kikou2=orderNorm(Err_add[-which(is.na(HERA_loc))])
+  } else{ kikou2=orderNorm(Err_add)}
+  
+  # this method: https://hess.copernicus.org/articles/15/255/2011/
+
+  #80% of data
+  taus <- c(.1,.9)
+  xx <- seq(min(kikou$x.t,na.rm=T),max(kikou$x.t,na.rm=T),length=100)
+  f <- coef(rq((kikou2$x.t)~(kikou$x.t),tau=taus))
+  yy <- cbind(1,xx)%*%f
+  t1lim=yy[which.min(abs(xx-(-2))),1]
+  t2lim=yy[which.min(abs(xx-(-2))),2]
+  yy[which(xx<(-2)),1]=t1lim
+  yy[which(xx<(-2)),2]=t2lim
+  for(i in 1:length(taus)){
+    lines(xx,yy[,i],col = "orange",lwd=3)
+  }
+  
+
+ #now backtransform that shit
+  btrans01=predict(kikou2, newdata = yy[,1], inverse = TRUE)
+  btrans02=predict(kikou2, newdata = yy[,2], inverse = TRUE)
+  btransQ=predict(kikou, newdata = xx, inverse = TRUE)
+  
+  # plot(HERA_loc,Err_add)
+  # lines(btransQ,btrans01,lwd=2,col=2)
+  # lines(btransQ,btrans02,lwd=2,col=2)
+  #final plot of 1 year of data + CI
+  HERA_lc=approx(btransQ,btrans01,HERA_loc)$y
+  HERA_uc=approx(btransQ,btrans02,HERA_loc)$y
+  
+  #validation
+  #this value should go down with KGE
+  verif=(length(which(Q_loc<(HERA_loc+HERA_uc) & Q_loc>(HERA_loc+HERA_lc)))/length(Q_loc))
+  
+ 
+  # main="HERA CI test"
+  # range=c(4400:5700)
+  # Hl_lc=HERA_loc+HERA_lc
+  # Hl_uc=HERA_loc+HERA_uc
+  # timeplt=time[-c(1:3)]
+  # dtall=data.frame(time=timeplt,Qsim=HERA_loc,Qlc=Hl_lc,Quc=Hl_uc,Qobs=Q_loc)
+  # dt=dtall[range,]
+  #   qlim=c(0.01,1.1*max(dt$Quc,na.rm=T))
+  #   plot(dt$time,dt$Qsim, type="n", ylim=qlim,
+  #        xlab = NA, ylab = expression(paste("Debit (",m^3/s,")")))
+  #   mtext(main,3,font = 2,line = 0.5,cex = .75)
+  #   polygon(c(dt$time,rev(dt$time)),c(dt$Qlc,rev(dt$Quc)),
+  #           col=alpha("lightblue",.8),border="transparent")
+  #   lines(dt$time, dt$Qsim, col="darkblue",lwd=2)
+  #   lines(dt$time, dt$Qlc, col="blue",lwd=1,lty=2)
+  #   lines(dt$time, dt$Quc, col="blue",lwd=1,lty=2)
+  #   lines(dt$time, dt$Qobs, col="darkred",lwd=2)
+  #   axis(2)
+  #   box()
+  #   legend("topleft", leg=c("simulated","90CI","10CI","observed"),
+  #          lwd=c(2,1,1,2), col=c("darkblue","blue","blue","darkred"),
+  #          cex=.8, lty=c(1,2,2,1))
+  
+  ###TBC
+  
+  
+  kge_hera=KGE(HERA_loc,Q_loc, na.rm=TRUE, method="2012",out.type="full")
+  skills_cor=rbind(skills_cor,c(Station,kge_hera$KGE.value,kge_hera$KGE.elements,verif))
+  }
+}
+
+hist(skills_cor[,6], breaks=120)
+length(which(skills_cor[,6]>0.5))/length(skills_cor[,6])
+plot(skills_cor[,4],skills_cor[,6],xlim=c(-0,2))
+
 ## Figure S2 Upstream area--------------------------------------
 
 ### Figure S2.a Map of upstream area--------------------------------------
+
+length(which(ValidSYl$UpA<=250))/length(ValidSYl$Var2)
 #Plot parameters
 cord.dec=ValidSYl[,c(1,2)]
 cord.dec = SpatialPoints(cord.dec, proj4string=CRS("+proj=longlat"))
@@ -493,6 +597,12 @@ corr=SpatialSkillPlot(ValidSY,"r",corrfile)[[1]]
 bias=SpatialSkillPlot(ValidSYl,"b",biasfile)[[1]]
 var=SpatialSkillPlot(ValidSY,"v",varfile)[[1]]
 
+
+length(which(kge$skill>0.5))/length(kge$skill)
+median(corr$skill)
+median(bias$skill)
+median(var$skill)
+quantile(var$skill,c(0.25,0.75))
 ValidSYl$UpA=ValidSYl$upa
 
 Plots=TRUE

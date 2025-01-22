@@ -37,11 +37,11 @@ for (y in yrlist){
 
 #Loading all txt files with matching locations
 #load matching coordinates
-Sloc=read.table(paste0(valid_path,"out/Stations_locations_EFAS_grid_1950.txt"),sep=",")
+Sloc=read.table(paste0(valid_path,"out/yearly/Stations_locations_EFAS_gridv2_1950.txt"),sep=",")
 yrlist=c(1951:2020)
 for (yi in yrlist){
   print(yi)
-  Slocy=read.table(paste0(valid_path,"out/Stations_locations_EFAS_grid_",yi,".txt"),sep=",")
+  Slocy=read.table(paste0(valid_path,"out/yearly/Stations_locations_EFAS_gridv2_",yi,".txt"),sep=",")
   Slocrep=Slocy[which(Sloc$V2==0),]
   Sloc[which(Sloc$V2==0),]=Slocrep
 }
@@ -321,7 +321,7 @@ HERA_data[,replax]=HERA_cordata[,-1]
 
 date2=seq(as.Date("1950-01-04"),as.Date("2020-12-31"),by="days")
 
-obs_Q=read.csv(file=paste0(valid_path,"Q_19502020.csv"))
+obs_Q=read.csv(file=paste0(valid_path,"out/Q_19502020.csv"))
 
 Q_data=obs_Q[,-1]
 Station_data_IDs <- as.vector(t(Q_data[1, -1]))
@@ -424,31 +424,6 @@ corrfile="out/EFAS_obs_corr_PearsonAY.csv"
 biasfile="out/EFAS_obs_biasAY.csv"
 varfile="out/EFAS_obs_variabilityAY.csv"
 
-
-kge=SpatialSkillPlot(ValidSta,"kge",kgefile)[[1]]
-cor=SpatialSkillPlot(ValidSta,"r",corrfile)[[1]]
-bias=SpatialSkillPlot(ValidSta,"b",biasfile)[[1]]
-var=SpatialSkillPlot(ValidSta,"v",varfile)[[1]]
-
-kgmatch=match(skills_hera[,1],kge$V1)
-kgef=kge[kgmatch,]
-corf=cor[kgmatch,]
-biasf=bias[kgmatch,]
-varf=var[kgmatch,]
-plot(corf$V1)
-points(skills_hera[,1],col=2)
-
-plot(corf$skill,skills_heraval[,3])
-abline(a=0,b=1)
-
-plot(biasf$skill,skills_heraval[,4])
-abline(a=0,b=1)
-
-plot(varf$skill,skills_heraval[,5])
-abline(a=0,b=1)
-
-plot(skills_hera[,2],skills_mhm[,2],xlim=c(-1,1), ylim=c(-1,1))
-abline(a=0,b=1)
 
 #remove the locations where there must be an issue
 #bias greater than 6
@@ -607,6 +582,57 @@ p1
 ggsave("Revisions/boxplot_KGE_compF.jpg", p1, width=15, height=20, units=c("cm"),dpi=500)
 
 
+
+
+#retain only stations that were used in EFAS calibration
+
+ValidFeat=skillv[,c(1:8,15,25,28,29,30,31)]
+
+smhm=match(skillm$V1,ValidFeat$V1)
+
+ValidFeat=cbind(ValidFeat,skillm[smhm,c(28,29,30,31)])
+names(ValidFeat)[c(11:14)]=c("KGEHERA","rHERA","bHERA","vHERA")
+names(ValidFeat)[c(15:18)]=c("KGEmHM","rmHM","bmHM","vmHM")
+
+ValidCalib=ValidFeat[which(ValidFeat$calib==TRUE),]
+
+write.csv(ValidCalib,file="out/HERAQvsmHM_CalT.csv", row.names = FALSE)
+
+
+#now extract these stations from HERAVAL and mhmQ
+
+id_HERA=match(ValidCalib$V1,HERA_ID)
+id_obs=match(ValidCalib$V1,Q_ID)
+
+
+Selected_river=finalcom_upaclean[match(ValidCalib$V1,finalcom_upaclean$V1),]
+id_mhm=Selected_river$filename
+mhmcol=match(id_mhm,name_vector2)
+
+HERA_St=HERA_Q[-1,id_HERA]
+Q_St=obs_Q[-c(1:4),id_obs]
+mhm_St=mhm_dis2[,mhmcol]
+
+#Save the files 
+
+
+
+#add time dimension
+HERA_St=data.frame(date_vector2,HERA_St)
+names(HERA_St)[1]="date"
+names(HERA_St)[c(2:172)]=ValidCalib$V1
+
+Q_St=data.frame(date_vector2,Q_St)
+names(Q_St)[1]="date"
+names(Q_St)[c(2:172)]=ValidCalib$V1
+
+write.csv(HERA_St,file="out/HERAQ_calTRUE.csv", row.names = FALSE)
+write.csv(Q_St,file="out/obsQ_calTRUE.csv", row.names = FALSE)
+
+mhm_St=data.frame(date_vector,mhm_St)
+names(mhm_St)[1]="date"
+names(mhm_St)[c(2:172)]=ValidCalib$V1
+write.csv(mhm_St,file="out/mHMQ_calTRUE.csv", row.names = FALSE)
 
 
 hvh=match(skillm[,3],finalcom_upaclean$V1)
